@@ -41,6 +41,10 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
+      - name: 前回の結果を取得（NEW 印の判定用）
+        run: |
+          mkdir -p results
+          curl -fsSL "https://yhiotsuka.github.io/narashino-tennis-checker/latest.json" -o results/latest.json || rm -f results/latest.json
       - name: 空き状況を取得
         env:
           COUNT: ${{ inputs.count || '7' }}
