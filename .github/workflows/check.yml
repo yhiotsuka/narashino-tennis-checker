@@ -42,8 +42,14 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - name: 空き状況を取得
+        env:
+          DAYS: ${{ inputs.days || '14' }}
+          ALL_DAYS: ${{ inputs.all_days }}
         run: |
-          python checker.py --days "${{ inputs.days || '14' }}" ${{ inputs.all_days && '--all-days' || '' }}
+          case "$DAYS" in ''|*[!0-9]*) echo "days は数字で指定してください: $DAYS"; exit 1;; esac
+          ARGS=(--days "$DAYS")
+          if [ "$ALL_DAYS" = "true" ]; then ARGS+=(--all-days); fi
+          python checker.py "${ARGS[@]}"
       - name: 公開用ファイルを用意
         if: always()
         run: |
