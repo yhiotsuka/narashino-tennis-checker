@@ -306,7 +306,7 @@ def render_html(records, meta):
 :root {{ --bg:#fff; --fg:#1f2328; --muted:#6b7280; --line:#e5e7eb; --free:#16a34a; --free-bg:#dcfce7; --busy-bg:#f3f4f6; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg:#111418; --fg:#e6e6e6; --muted:#9aa3ad; --line:#2a2f36; --free:#4ade80; --free-bg:#14532d; --busy-bg:#1c2127; }} }}
 body {{ margin:0; padding:16px; background:var(--bg); color:var(--fg); font-family:system-ui,"Hiragino Sans","Yu Gothic UI",sans-serif; }}
-header {{ position:sticky; top:0; background:var(--bg); padding-bottom:8px; border-bottom:1px solid var(--line); }}
+header {{ position:sticky; top:0; z-index:10; background:var(--bg); padding-bottom:8px; border-bottom:1px solid var(--line); }}
 h1 {{ font-size:20px; margin:0 0 4px; }} .meta {{ color:var(--muted); font-size:13px; }}
 label {{ display:inline-block; margin-top:8px; font-size:14px; cursor:pointer; }}
 h2 {{ font-size:17px; margin:0; display:inline; }}
