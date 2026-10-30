@@ -16,8 +16,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: tennis-check
@@ -30,9 +28,6 @@ jobs:
     env:
       TZ: Asia/Tokyo
       PYTHONIOENCODING: utf-8
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,9 +37,11 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - name: 前回の結果を取得（NEW 印の判定用）
-        run: |
-          mkdir -p results
-          curl -fsSL "https://yhiotsuka.github.io/narashino-tennis-checker/latest.json" -o results/latest.json || rm -f results/latest.json
+        uses: actions/cache/restore@v4
+        with:
+          path: results/latest.json
+          key: latest-json-${{ github.run_id }}
+          restore-keys: latest-json-
       - name: 空き状況を取得
         env:
           COUNT: ${{ inputs.count || '7' }}
@@ -54,14 +51,25 @@ jobs:
           ARGS=(--count "$COUNT")
           if [ "$ALL_DAYS" = "true" ]; then ARGS+=(--all-days); fi
           python checker.py "${ARGS[@]}"
+      - name: 今回の結果を保存（次回の NEW 判定用）
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: results/latest.json
+          key: latest-json-${{ github.run_id }}
       - name: 公開用ファイルを用意
         if: always()
         run: |
-          mkdir -p site
-          if [ -f results/latest.html ]; then cp results/latest.html site/index.html; fi
-          cp results/*.json results/*.csv site/ 2>/dev/null || true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deploy
-        uses: actions/deploy-pages@v4
+          # フォルダ名が Vercel のプロジェクト名（= URL）になる
+          mkdir -p narashino-tennis
+          if [ -f results/latest.html ]; then cp results/latest.html narashino-tennis/index.html; fi
+          cp results/latest.json narashino-tennis/ 2>/dev/null || true
+      - name: Vercel に公開
+        if: always()
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          test -n "$VERCEL_TOKEN" || { echo "VERCEL_TOKEN が未設定です（Settings → Secrets and variables → Actions）"; exit 1; }
+          test -f narashino-tennis/index.html || { echo "公開するページがありません"; exit 1; }
+          cd narashino-tennis
+          npx --yes vercel@39 deploy --prod --yes --token "$VERCEL_TOKEN" --scope yoheis-projects-1782b94d

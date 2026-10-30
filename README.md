@@ -19,7 +19,7 @@ python checker.py [オプション]
 
 ### GitHub で自動実行（スマホで見る）
 `.github/workflows/check.yml` により、GitHub Actions が毎日 **JST 7:00 / 19:00** に今日以降の土日祝を7日分取得し、
-結果を GitHub Pages に公開します。スマホでは Pages のURLを開くだけで最新の空き状況が見られます。
+結果を Vercel に公開します（リポジトリ Secrets に `VERCEL_TOKEN` が必要）。スマホでは公開URLを開くだけで最新の空き状況が見られます。
 今すぐ更新したいときは、GitHub アプリ（またはブラウザ）で Actions → 「テニスコート空き状況チェック」→ **Run workflow**
 （日数・平日を含めるかも指定可）。
 
