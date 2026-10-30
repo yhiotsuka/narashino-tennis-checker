@@ -1,0 +1,5 @@
+results/
+samples/
+scripts/
+__pycache__/
+*.log
