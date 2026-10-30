@@ -220,6 +220,11 @@ def write_outputs(records, notes, elapsed, navs, generated):
     return out / f"{stem}.json", html_path
 
 
+# 予約サイトの入口（途中画面のURLはセッション切れになるため、トップに飛ばす）
+BOOKING_SP = "https://www.cm1.eprs.jp/yoyaku-chiba/sp/"
+BOOKING_PC = "https://www.cm1.eprs.jp/yoyaku-chiba/w/"
+
+
 def time_band(start):
     h = int(start[:2])
     return "am" if h < 12 else "pm" if h < 17 else "night"
@@ -335,6 +340,9 @@ ul.notes {{ color:var(--muted); font-size:12px; }}
 .chip b {{ font-size:16px; }} .chip small {{ font-size:11px; opacity:.9; }}
 .chip.new::after {{ content:"NEW"; position:absolute; top:-7px; right:-6px; background:#ef4444; color:#fff; font-size:9px; font-weight:700; padding:1px 4px; border-radius:6px; }}
 .hide {{ display:none !important; }}
+.links {{ display:flex; gap:12px; align-items:center; margin-top:8px; font-size:13px; }}
+.links a {{ color:var(--muted); }}
+.links a.book {{ background:var(--free); color:var(--bg); text-decoration:none; font-weight:700; padding:7px 14px; border-radius:999px; }}
 @media (max-width:600px) {{
   body {{ padding:12px; }} h1 {{ font-size:17px; }}
   th {{ padding:3px 4px; font-size:12px; }}
@@ -345,13 +353,14 @@ ul.notes {{ color:var(--muted); font-size:12px; }}
 <header>
 <h1>習志野市 テニスコート空き状況</h1>
 <div class="meta">生成日時 {gen}　／　空き {meta["free_count"]} コマ　／　所要 {meta["elapsed_sec"]} 秒・{meta["page_loads"]} 遷移</div>
+<div class="links"><a class="book" href="{BOOKING_SP}" target="_blank" rel="noopener">予約サイトを開く（スマホ版）</a><a href="{BOOKING_PC}" target="_blank" rel="noopener">PC版</a></div>
 <label><input type="checkbox" id="onlyFree"> 空きのみ表示</label>
 </header>
 {summary}
 <div class="meta">日付をタップすると、コートごとの詳細が開きます。</div>
 {body}
 <ul class="notes">{notes}</ul>
-<p class="meta">出典: ちば施設予約システム（閲覧のみ）。予約は公式サイトから行ってください。</p>
+<p class="meta">出典: ちば施設予約システム（閲覧のみ）。予約は<a href="{BOOKING_SP}" target="_blank" rel="noopener">公式サイト</a>から行ってください。</p>
 <script>
 const cb = document.getElementById('onlyFree');
 try {{ cb.checked = localStorage.getItem('onlyFree') === '1'; }} catch (e) {{}}
