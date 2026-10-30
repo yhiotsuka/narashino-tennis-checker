@@ -222,8 +222,9 @@ def render_html(records, meta):
     for ymd in sorted(tree):
         d = dt.datetime.strptime(ymd, "%Y%m%d").date()
         day_free = sum(r["status"] == "空き" for v in tree[ymd].values() for c in v.values() for r in c)
-        parts.append(f'<section class="day{" has-free" if day_free else ""}">'
-                     f'<h2>{html.escape(day_label(d))} <span class="cnt">空き {day_free}</span></h2>')
+        # 日付ごとの詳細は折りたたみ（タップで開く）
+        parts.append(f'<details class="day{" has-free" if day_free else ""}">'
+                     f'<summary><h2>{html.escape(day_label(d))} <span class="cnt">空き {day_free}</span></h2></summary>')
         for venue, courts in tree[ymd].items():
             v_free = sum(r["status"] == "空き" for c in courts.values() for r in c)
             parts.append(f'<div class="venue{" has-free" if v_free else ""}"><h3>{html.escape(venue)}</h3><table>')
@@ -236,7 +237,7 @@ def render_html(records, meta):
                     for s in slots)
                 parts.append(f'<tr class="{"has-free" if c_free else ""}"><th>{html.escape(short_court(court))}</th>{cells}</tr>')
             parts.append("</table></div>")
-        parts.append("</section>")
+        parts.append("</details>")
     # 先頭に置く空き一覧（スマホで最初に見たい情報）
     free_list = []
     for ymd in sorted(tree):
@@ -264,14 +265,19 @@ body {{ margin:0; padding:16px; background:var(--bg); color:var(--fg); font-fami
 header {{ position:sticky; top:0; background:var(--bg); padding-bottom:8px; border-bottom:1px solid var(--line); }}
 h1 {{ font-size:20px; margin:0 0 4px; }} .meta {{ color:var(--muted); font-size:13px; }}
 label {{ display:inline-block; margin-top:8px; font-size:14px; cursor:pointer; }}
-h2 {{ font-size:17px; margin:24px 0 8px; }} h3 {{ font-size:14px; margin:12px 0 4px; color:var(--muted); }}
+h2 {{ font-size:17px; margin:0; display:inline; }}
+details.day {{ border-bottom:1px solid var(--line); padding:10px 0; }}
+details.day > summary {{ cursor:pointer; list-style:none; }} details.day > summary::-webkit-details-marker {{ display:none; }}
+details.day > summary::before {{ content:"▸"; display:inline-block; width:1.1em; color:var(--muted); transition:transform .15s; }}
+details.day[open] > summary::before {{ transform:rotate(90deg); }}
+details.day:not(.has-free) .cnt {{ color:var(--muted); }} h3 {{ font-size:14px; margin:12px 0 4px; color:var(--muted); }}
 .cnt {{ font-size:13px; font-weight:normal; color:var(--free); }}
 .venue {{ overflow-x:auto; }} table {{ border-collapse:collapse; }}
 th {{ text-align:left; padding:4px 8px; white-space:nowrap; font-weight:600; font-size:13px; }}
 td {{ padding:4px 6px; border:2px solid var(--bg); background:var(--busy-bg); color:var(--muted); font-size:12px; min-width:84px; text-align:center; }}
 td .t {{ display:block; }} td .s {{ display:block; font-size:11px; }}
 td.free {{ background:var(--free-bg); color:var(--free); font-weight:700; }}
-body.only-free section:not(.has-free), body.only-free .venue:not(.has-free), body.only-free tr:not(.has-free), body.only-free td.busy {{ display:none; }}
+body.only-free details.day:not(.has-free), body.only-free .venue:not(.has-free), body.only-free tr:not(.has-free), body.only-free td.busy {{ display:none; }}
 ul.notes {{ color:var(--muted); font-size:12px; }}
 .summary {{ margin:12px 0; font-size:14px; }} .summary summary {{ font-weight:700; cursor:pointer; }}
 .summary ul {{ padding-left:18px; margin:6px 0; }} .summary li {{ margin:6px 0; }}
@@ -289,6 +295,7 @@ ul.notes {{ color:var(--muted); font-size:12px; }}
 <label><input type="checkbox" id="onlyFree"> 空きのみ表示</label>
 </header>
 {summary}
+<div class="meta">日付をタップすると、コートごとの詳細が開きます。</div>
 {body}
 <ul class="notes">{notes}</ul>
 <p class="meta">出典: ちば施設予約システム（閲覧のみ）。予約は公式サイトから行ってください。</p>
