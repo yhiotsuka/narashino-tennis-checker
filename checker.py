@@ -183,22 +183,51 @@ def unbooked_month_notes(records):
             for (v, m), st in sorted(stat.items()) if st["予約"] == 0 and st["空き"] > 0]
 
 
+def previous_states(path):
+    """前回の latest.json から コマ → 状態 を読む（無ければ空）"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return {slot_key(r): r["status"] for r in json.load(f)["slots"]}
+    except Exception:
+        return {}
+
+
+def slot_key(r):
+    return (r["venue_cd"], r["icd"], r["date"], r["start"])
+
+
 def write_outputs(records, notes, elapsed, navs, generated):
     notes = notes + unbooked_month_notes(records)
     out = ROOT / "results"
     out.mkdir(exist_ok=True)
+    # 前回は空きでなかったのに今回空いたコマに NEW 印（前回に無い日付は対象外）
+    prev = previous_states(out / "latest.json")
+    for r in records:
+        r["new"] = r["status"] == "空き" and prev.get(slot_key(r), "空き") != "空き"
     stem = generated.strftime("%Y%m%d_%H%M")
     meta = {"generated": generated.isoformat(timespec="seconds"), "elapsed_sec": round(elapsed),
             "page_loads": navs, "free_count": sum(r["status"] == "空き" for r in records), "notes": notes}
     with open(out / f"{stem}.json", "w", encoding="utf-8") as f:
         json.dump({**meta, "slots": records}, f, ensure_ascii=False, indent=1)
     with open(out / f"{stem}.csv", "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["date", "venue", "court", "start", "end", "status", "venue_cd", "icd"])
+        w = csv.DictWriter(f, fieldnames=["date", "venue", "court", "start", "end", "status", "new", "venue_cd", "icd"])
         w.writeheader()
         w.writerows(records)
+    with open(out / "latest.json", "w", encoding="utf-8") as f:
+        json.dump({**meta, "slots": records}, f, ensure_ascii=False, indent=1)
     html_path = out / "latest.html"
     html_path.write_text(render_html(records, meta), encoding="utf-8")
     return out / f"{stem}.json", html_path
+
+
+# 予約サイトの入口（途中画面のURLはセッション切れになるため、トップに飛ばす）
+BOOKING_SP = "https://www.cm1.eprs.jp/yoyaku-chiba/sp/"
+BOOKING_PC = "https://www.cm1.eprs.jp/yoyaku-chiba/w/"
+
+
+def time_band(start):
+    h = int(start[:2])
+    return "am" if h < 12 else "pm" if h < 17 else "night"
 
 
 def hhmm(s):
@@ -238,20 +267,35 @@ def render_html(records, meta):
                 parts.append(f'<tr class="{"has-free" if c_free else ""}"><th>{html.escape(short_court(court))}</th>{cells}</tr>')
             parts.append("</table></div>")
         parts.append("</details>")
-    # 先頭に置く空き一覧（スマホで最初に見たい情報）
-    free_list = []
+    # 先頭に置く空き一覧（スマホで最初に見たい情報）: 日付カード＋時間チップ
+    cards = []
     for ymd in sorted(tree):
-        lines = []
+        rows = []
         for v, courts in tree[ymd].items():
-            per_court = [f'{html.escape(short_court(c))}: {" ".join(hhmm(r["start"]) for r in slots if r["status"] == "空き")}'
-                         for c, slots in courts.items() if any(r["status"] == "空き" for r in slots)]
-            if per_court:
-                lines.append(f'<div><span class="vn">{html.escape(short_venue(v))}</span> {" ／ ".join(per_court)}</div>')
-        if lines:
+            by_time = {}
+            for c, slots in courts.items():
+                for r in slots:
+                    if r["status"] == "空き":
+                        t = by_time.setdefault(r["start"], {"courts": [], "new": False})
+                        t["courts"].append(short_court(c))
+                        t["new"] |= r.get("new", False)
+            if by_time:
+                chips = "".join(
+                    f'<span class="chip{" new" if t["new"] else ""}" data-band="{time_band(st)}">'
+                    f'<b>{hhmm(st)}</b><small>{html.escape("・".join(t["courts"]))}</small></span>'
+                    for st, t in sorted(by_time.items()))
+                rows.append(f'<div class="vrow"><div class="vn">{html.escape(short_venue(v))}</div><div class="chips">{chips}</div></div>')
+        if rows:
             d = dt.datetime.strptime(ymd, "%Y%m%d").date()
-            free_list.append(f'<li><b>{html.escape(day_label(d))}</b>{"".join(lines)}</li>')
-    summary = (f'<details class="summary" open><summary>空き一覧（{meta["free_count"]}コマ）</summary><ul>{"".join(free_list)}</ul></details>'
-               if free_list else '<p class="summary">空きはありません。</p>')
+            n = sum(r["status"] == "空き" for c in tree[ymd].values() for sl in c.values() for r in sl)
+            cards.append(f'<div class="card"><div class="ch">{html.escape(day_label(d))}<span class="cn">空き {n}</span></div>{"".join(rows)}</div>')
+    new_count = sum(r.get("new", False) for r in records)
+    filters = "".join(f'<button type="button" data-f="{k}"{" class=on" if k == "all" else ""}>{label}</button>'
+                      for k, label in [("all", "すべて"), ("am", "午前"), ("pm", "午後"), ("night", "夜 17時〜")])
+    summary = (f'<section class="free"><div class="fh"><h2>空き一覧 <span class="cn">{meta["free_count"]}コマ'
+               f'{f"（NEW {new_count}）" if new_count else ""}</span></h2><div class="filters">{filters}</div></div>'
+               f'{"".join(cards)}<p class="none" hidden>この時間帯の空きはありません。</p></section>'
+               if cards else '<p class="summary">空きはありません。</p>')
     notes = "".join(f"<li>{html.escape(n)}</li>" for n in meta["notes"])
     gen = dt.datetime.fromisoformat(meta["generated"]).strftime("%Y-%m-%d %H:%M")
     body = "".join(parts) or "<p>データがありません。</p>"
@@ -279,9 +323,26 @@ td .t {{ display:block; }} td .s {{ display:block; font-size:11px; }}
 td.free {{ background:var(--free-bg); color:var(--free); font-weight:700; }}
 body.only-free details.day:not(.has-free), body.only-free .venue:not(.has-free), body.only-free tr:not(.has-free), body.only-free td.busy {{ display:none; }}
 ul.notes {{ color:var(--muted); font-size:12px; }}
-.summary {{ margin:12px 0; font-size:14px; }} .summary summary {{ font-weight:700; cursor:pointer; }}
-.summary ul {{ padding-left:18px; margin:6px 0; }} .summary li {{ margin:6px 0; }}
-.summary li div {{ margin-left:4px; }} .vn {{ display:inline-block; min-width:3.5em; color:var(--free); font-weight:700; }}
+.summary {{ margin:12px 0; font-size:14px; }}
+.free {{ margin:12px 0 20px; }} .fh h2 {{ display:block; margin:0 0 8px; }}
+.filters {{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }}
+.filters button {{ border:1px solid var(--line); background:var(--bg); color:var(--fg); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; }}
+.filters button.on {{ background:var(--free); border-color:var(--free); color:var(--bg); font-weight:700; }}
+.card {{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin:10px 0; box-shadow:0 1px 2px rgba(0,0,0,.04); }}
+.ch {{ font-size:16px; font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; align-items:baseline; }}
+.cn {{ font-size:13px; font-weight:600; color:var(--free); }}
+.vrow {{ display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-top:1px dashed var(--line); }}
+.vrow:first-of-type {{ border-top:0; }}
+.vn {{ flex:0 0 3.6em; font-weight:700; font-size:14px; padding-top:6px; }}
+.chips {{ display:flex; flex-wrap:wrap; gap:6px; }}
+.chip {{ position:relative; display:inline-flex; flex-direction:column; align-items:center; min-width:56px; padding:5px 8px;
+  border-radius:10px; background:var(--free-bg); color:var(--free); line-height:1.2; }}
+.chip b {{ font-size:16px; }} .chip small {{ font-size:11px; opacity:.9; }}
+.chip.new::after {{ content:"NEW"; position:absolute; top:-7px; right:-6px; background:#ef4444; color:#fff; font-size:9px; font-weight:700; padding:1px 4px; border-radius:6px; }}
+.hide {{ display:none !important; }}
+.links {{ display:flex; gap:12px; align-items:center; margin-top:8px; font-size:13px; }}
+.links a {{ color:var(--muted); }}
+.links a.book {{ background:var(--free); color:var(--bg); text-decoration:none; font-weight:700; padding:7px 14px; border-radius:999px; }}
 @media (max-width:600px) {{
   body {{ padding:12px; }} h1 {{ font-size:17px; }}
   th {{ padding:3px 4px; font-size:12px; }}
@@ -292,18 +353,33 @@ ul.notes {{ color:var(--muted); font-size:12px; }}
 <header>
 <h1>習志野市 テニスコート空き状況</h1>
 <div class="meta">生成日時 {gen}　／　空き {meta["free_count"]} コマ　／　所要 {meta["elapsed_sec"]} 秒・{meta["page_loads"]} 遷移</div>
+<div class="links"><a class="book" href="{BOOKING_SP}" target="_blank" rel="noopener">予約サイトを開く（スマホ版）</a><a href="{BOOKING_PC}" target="_blank" rel="noopener">PC版</a></div>
 <label><input type="checkbox" id="onlyFree"> 空きのみ表示</label>
 </header>
 {summary}
 <div class="meta">日付をタップすると、コートごとの詳細が開きます。</div>
 {body}
 <ul class="notes">{notes}</ul>
-<p class="meta">出典: ちば施設予約システム（閲覧のみ）。予約は公式サイトから行ってください。</p>
+<p class="meta">出典: ちば施設予約システム（閲覧のみ）。予約は<a href="{BOOKING_SP}" target="_blank" rel="noopener">公式サイト</a>から行ってください。</p>
 <script>
 const cb = document.getElementById('onlyFree');
 try {{ cb.checked = localStorage.getItem('onlyFree') === '1'; }} catch (e) {{}}
 const apply = () => {{ document.body.classList.toggle('only-free', cb.checked); try {{ localStorage.setItem('onlyFree', cb.checked ? '1' : '0'); }} catch (e) {{}} }};
 cb.addEventListener('change', apply); apply();
+// 時間帯フィルタ: 該当しないチップを隠し、空になった館・日付も隠す
+const btns = document.querySelectorAll('.filters button');
+const setBand = (f) => {{
+  btns.forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('hide', f !== 'all' && c.dataset.band !== f));
+  document.querySelectorAll('.vrow').forEach(r => r.classList.toggle('hide', !r.querySelector('.chip:not(.hide)')));
+  let any = false;
+  document.querySelectorAll('.card').forEach(c => {{ const on = !!c.querySelector('.vrow:not(.hide)'); c.classList.toggle('hide', !on); any ||= on; }});
+  const none = document.querySelector('.free .none'); if (none) none.hidden = any;
+  try {{ localStorage.setItem('band', f); }} catch (e) {{}}
+}};
+btns.forEach(b => b.addEventListener('click', () => setBand(b.dataset.f)));
+let saved = 'all'; try {{ saved = localStorage.getItem('band') || 'all'; }} catch (e) {{}}
+setBand(saved);
 </script>
 </body></html>
 """

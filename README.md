@@ -62,3 +62,8 @@ Python 3.12 / `pip install playwright jpholiday` / `python -m playwright install
 - `run.bat` … ダブルクリック実行用
 - `README_調査結果.md` … サイト構造の調査メモ（URL・フォーム項目・HTML構造）
 - `scripts\` … 調査時のスクリプト、`samples\` … 調査時のサンプルHTML
+
+### 結果ページの見方
+- 先頭の「空き一覧」は日付ごとのカードで、館ごとに空いている開始時刻とコート名を表示します。
+- 「午前／午後／夜 17時〜」ボタンで時間帯を絞り込めます（選択は次回も保持）。
+- 前回の実行では空いていなかったコマには **NEW** 印が付きます。
