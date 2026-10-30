@@ -120,6 +120,8 @@ def run(args):
     start = dt.datetime.strptime(args.start, "%Y%m%d").date() if args.start else dt.date.today()
     max_days = args.days or MAX_DAYS_DEFAULT
     dates = list(target_dates(start, max_days, args.all_days))
+    if args.count:
+        dates = dates[:args.count]
     venues = args.venues or list(VENUES)
     records, notes = [], []
     t0 = time.monotonic()
@@ -304,6 +306,7 @@ def main():
     ap = argparse.ArgumentParser(description="習志野市テニスコート空き状況チェッカー（閲覧のみ）")
     ap.add_argument("--all-days", action="store_true", help="平日も含める（既定は土日祝のみ）")
     ap.add_argument("--days", type=int, help=f"今日から何日先までを対象にするか（既定: 受付期間の終わりまで、最大{MAX_DAYS_DEFAULT}日）")
+    ap.add_argument("--count", type=int, help="対象日を先頭から何日分にするか（例: 7 で土日祝7日分）")
     ap.add_argument("--start", help="開始日 YYYYMMDD（既定: 今日）")
     ap.add_argument("--venues", nargs="+", choices=list(VENUES), help="対象館コード（既定: 4館すべて）")
     ap.add_argument("--open", action="store_true", help="終了後に latest.html をブラウザで開く")

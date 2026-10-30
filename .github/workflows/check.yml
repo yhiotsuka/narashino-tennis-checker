@@ -6,9 +6,9 @@ on:
     - cron: "0 10 * * *"  # JST 19:00
   workflow_dispatch:
     inputs:
-      days:
-        description: "今日から何日先まで（土日祝のみ）"
-        default: "14"
+      count:
+        description: "対象日を何日分取得するか（既定は土日祝のみ）"
+        default: "7"
       all_days:
         description: "平日も含める"
         type: boolean
@@ -43,11 +43,11 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: 空き状況を取得
         env:
-          DAYS: ${{ inputs.days || '14' }}
+          COUNT: ${{ inputs.count || '7' }}
           ALL_DAYS: ${{ inputs.all_days }}
         run: |
-          case "$DAYS" in ''|*[!0-9]*) echo "days は数字で指定してください: $DAYS"; exit 1;; esac
-          ARGS=(--days "$DAYS")
+          case "$COUNT" in ''|*[!0-9]*) echo "count は数字で指定してください: $COUNT"; exit 1;; esac
+          ARGS=(--count "$COUNT")
           if [ "$ALL_DAYS" = "true" ]; then ARGS+=(--all-days); fi
           python checker.py "${ARGS[@]}"
       - name: 公開用ファイルを用意

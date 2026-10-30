@@ -18,7 +18,7 @@ python checker.py [オプション]
 ```
 
 ### GitHub で自動実行（スマホで見る）
-`.github/workflows/check.yml` により、GitHub Actions が毎日 **JST 7:00 / 19:00** に今日から14日分（土日祝）を取得し、
+`.github/workflows/check.yml` により、GitHub Actions が毎日 **JST 7:00 / 19:00** に今日以降の土日祝を7日分取得し、
 結果を GitHub Pages に公開します。スマホでは Pages のURLを開くだけで最新の空き状況が見られます。
 今すぐ更新したいときは、GitHub アプリ（またはブラウザ）で Actions → 「テニスコート空き状況チェック」→ **Run workflow**
 （日数・平日を含めるかも指定可）。
@@ -26,6 +26,7 @@ python checker.py [オプション]
 | オプション | 意味 |
 |---|---|
 | `--days N` | 今日から N 日先までに限定（例: `--days 14` で2週間分） |
+| `--count N` | 対象日を先頭から N 日分に限定（例: `--count 7` で土日祝7日分） |
 | `--all-days` | 平日も含める（既定は土日祝のみ。祝日は jpholiday で判定） |
 | `--start YYYYMMDD` | 開始日を指定（既定: 今日） |
 | `--venues U4020 U4070` | 館を絞る（U4020 秋津 / U4030 芝園 / U4040 袖ケ浦 / U4070 実籾） |
